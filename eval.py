@@ -16,19 +16,19 @@ from config import build_config
 
 def parse_args():
     parser = argparse.ArgumentParser(description='YOLOF Evaluation')
-    parser.add_argument('--cuda', action='store_true', default=False, 
+    parser.add_argument('--cuda', action='store_false', default=True, 
                         help='use cuda.')
     # model
-    parser.add_argument('-v', '--version', default='yolof50',
+    parser.add_argument('-v', '--version', default='yolof-r50-DC5',
                         help='build yolof')
-    parser.add_argument('--weight', default=None, type=str,
+    parser.add_argument('--weight', default='ckpts/yolof-r50-DC5_1x_38.7.pth', type=str,
                         help='Trained state_dict file path to open')
     parser.add_argument('--topk', default=1000, type=int,
                         help='NMS threshold')
     # dataset
-    parser.add_argument('--root', default='/mnt/share/ssd2/dataset',
+    parser.add_argument('--root', default='/home/tsvanco/OD/datasets',
                         help='data root')
-    parser.add_argument('-d', '--dataset', default='coco',
+    parser.add_argument('-d', '--dataset', default='coco-val',
                         help='coco, voc.')
 
     return parser.parse_args()

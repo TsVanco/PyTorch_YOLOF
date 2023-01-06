@@ -23,7 +23,7 @@ from config import build_config
 def parse_args():
     parser = argparse.ArgumentParser(description='YOLOF Detection')
     # basic
-    parser.add_argument('--cuda', action='store_true', default=False,
+    parser.add_argument('--cuda', action='store_false', default=True,
                         help='use cuda.')
     parser.add_argument('-bs', '--batch_size', default=16, type=int, 
                         help='Batch size on single GPU for training')

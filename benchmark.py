@@ -16,24 +16,24 @@ from config import build_config
 
 parser = argparse.ArgumentParser(description='Benchmark')
 # Model
-parser.add_argument('-v', '--version', default='yolof50',
+parser.add_argument('-v', '--version', default='yolof-r50-DC5',
                     help='build yolof')
 parser.add_argument('--fuse_conv_bn', action='store_true', default=False,
                     help='fuse conv and bn')
 parser.add_argument('--topk', default=100, type=int,
                     help='NMS threshold')
 # data root
-parser.add_argument('--root', default='/mnt/share/ssd2/dataset',
+parser.add_argument('--root', default='/home/tsvanco/OD/datasets',
                     help='data root')
 # basic
 parser.add_argument('--min_size', default=800, type=int,
                     help='the min size of input image')
 parser.add_argument('--max_size', default=1333, type=int,
                     help='the min size of input image')
-parser.add_argument('--weight', default=None, type=str,
+parser.add_argument('--weight', default='ckpts/yolof-r50-DC5_1x_38.7.pth', type=str,
                     help='Trained state_dict file path to open')
 # cuda
-parser.add_argument('--cuda', action='store_true', default=False, 
+parser.add_argument('--cuda', action='store_false', default=True,
                     help='use cuda.')
 
 args = parser.parse_args()
@@ -41,9 +41,9 @@ args = parser.parse_args()
 
 def test(args, net, device, testset, transform):
     # Step-1: Compute FLOPs and Params
-    FLOPs_and_Params(model=net, 
+    FLOPs_and_Params(model=net,
                      min_size=args.min_size,
-                     max_size=args.max_size, 
+                     max_size=args.max_size,
                      device=device)
 
     # Step-2: Compute FPS
@@ -53,7 +53,8 @@ def test(args, net, device, testset, transform):
     with torch.no_grad():
         for index in range(num_images):
             if index % 500 == 0:
-                print('Testing image {:d}/{:d}....'.format(index+1, num_images))
+                print(
+                    'Testing image {:d}/{:d}....'.format(index+1, num_images))
             image, _ = testset.pull_image(index)
 
             h, w, _ = image.shape
@@ -65,11 +66,13 @@ def test(args, net, device, testset, transform):
 
             # star time
             torch.cuda.synchronize()
-            start_time = time.perf_counter()    
+            start_time = time.perf_counter()
 
             # inference
+            net.trainable=False
+            model.to(device).eval()
             bboxes, scores, cls_inds = net(x)
-            
+
             # rescale
             bboxes *= orig_size
 
@@ -81,9 +84,8 @@ def test(args, net, device, testset, transform):
             if index > 1:
                 total_time += elapsed
                 count += 1
-            
-        print('- FPS :', 1.0 / (total_time / count))
 
+        print('- FPS :', 1.0 / (total_time / count))
 
 
 if __name__ == '__main__':
@@ -101,16 +103,16 @@ if __name__ == '__main__':
     class_indexs = coco_class_index
     num_classes = 80
     dataset = COCODataset(
-                data_dir=data_dir,
-                image_set='val2017')
+        data_dir=data_dir,
+        image_set='val2017')
 
     # YOLOF Config
     cfg = build_config(args)
     # build model
-    model = build_model(args=args, 
+    model = build_model(args=args,
                         cfg=cfg,
-                        device=device, 
-                        num_classes=num_classes, 
+                        device=device,
+                        num_classes=num_classes,
                         trainable=False)
 
     # load trained weight
@@ -124,16 +126,11 @@ if __name__ == '__main__':
         model = fuse_conv_bn(model)
 
     # transform
-    transform = ValTransforms(min_size=args.min_size, 
+    transform = ValTransforms(min_size=args.min_size,
                               max_size=args.max_size,
                               pixel_mean=cfg['pixel_mean'],
                               pixel_std=cfg['pixel_std'],
                               format=cfg['format'])
 
     # run
-    test(args=args,
-        net=model, 
-        device=device, 
-        testset=dataset,
-        transform=transform
-        )
+    test(args, model, device, dataset, transform)

@@ -6,3 +6,5 @@
 __pycache__
 det_results
 .vscode
+ckpts
+weights
