@@ -11,6 +11,7 @@ class SigmoidFocalWithLogitsLoss(nn.Module):
     """
         focal loss with sigmoid
     """
+
     def __init__(self, reduction='mean', gamma=2.0, alpha=0.25):
         super(SigmoidFocalWithLogitsLoss, self).__init__()
         self.reduction = reduction
@@ -19,14 +20,15 @@ class SigmoidFocalWithLogitsLoss(nn.Module):
 
     def forward(self, logits, targets):
         p = torch.sigmoid(logits)
-        ce_loss = F.binary_cross_entropy_with_logits(input=logits, 
-                                                     target=targets, 
+        ce_loss = F.binary_cross_entropy_with_logits(input=logits,
+                                                     target=targets,
                                                      reduction="none")
         p_t = p * targets + (1.0 - p) * (1.0 - targets)
         loss = ce_loss * ((1.0 - p_t) ** self.gamma)
 
         if self.alpha >= 0:
-            alpha_t = self.alpha * targets + (1.0 - self.alpha) * (1.0 - targets)
+            alpha_t = self.alpha * targets + \
+                (1.0 - self.alpha) * (1.0 - targets)
             loss = alpha_t * loss
 
         if self.reduction == "mean":
@@ -50,8 +52,8 @@ class Criterion(nn.Module):
         self.loss_cls_weight = cfg['loss_cls_weight']
         self.loss_reg_weight = cfg['loss_reg_weight']
 
-        self.cls_loss_f = SigmoidFocalWithLogitsLoss(reduction='none', gamma=cfg['gamma'], alpha=cfg['alpha'])
-
+        self.cls_loss_f = SigmoidFocalWithLogitsLoss(
+            reduction='none', gamma=cfg['gamma'], alpha=cfg['alpha'])
 
     def loss_labels(self, pred_cls, tgt_cls, num_boxes):
         """
@@ -62,7 +64,6 @@ class Criterion(nn.Module):
         loss_cls = self.cls_loss_f(pred_cls, tgt_cls)
 
         return loss_cls.sum() / num_boxes
-
 
     def loss_bboxes(self, pred_box, tgt_box, num_boxes):
         """
@@ -75,7 +76,6 @@ class Criterion(nn.Module):
         loss_reg = 1. - torch.diag(pred_giou)
 
         return loss_reg.sum() / num_boxes
-
 
     def forward(self, outputs, targets):
         """
@@ -123,14 +123,15 @@ class Criterion(nn.Module):
 
         src_idx = torch.cat(
             [src + idx * anchor_boxes[0].shape[0] for idx, (src, _) in
-             enumerate(indices)])
+             enumerate(indices)]).to(self.device)
         # [BM,]
         gt_cls = torch.full(pred_cls.shape[:1],
-                                self.num_classes,
-                                dtype=torch.int64,
-                                device=self.device)
+                            self.num_classes,
+                            dtype=torch.int64,
+                            device=self.device)
         gt_cls[ignore_idx] = -1
-        tgt_cls_o = torch.cat([t['labels'][J] for t, (_, J) in zip(targets, indices)])
+        tgt_cls_o = torch.cat([t['labels'][J]
+                              for t, (_, J) in zip(targets, indices)])
         tgt_cls_o[pos_ignore_idx] = -1
 
         gt_cls[src_idx] = tgt_cls_o.to(self.device)
@@ -143,22 +144,23 @@ class Criterion(nn.Module):
 
         if is_dist_avail_and_initialized():
             torch.distributed.all_reduce(num_foreground)
-        num_foreground = torch.clamp(num_foreground / get_world_size(), min=1).item()
+        num_foreground = torch.clamp(
+            num_foreground / get_world_size(), min=1).item()
 
         # cls loss
         masks = outputs['mask']
         valid_idxs = (gt_cls >= 0) & masks
-        loss_labels = self.loss_labels(pred_cls[valid_idxs], 
-                                       gt_cls_target[valid_idxs], 
+        loss_labels = self.loss_labels(pred_cls[valid_idxs],
+                                       gt_cls_target[valid_idxs],
                                        num_foreground)
 
         # box loss
         tgt_boxes = torch.cat([t['boxes'][i]
-                                    for t, (_, i) in zip(targets, indices)], dim=0).to(self.device)
+                               for t, (_, i) in zip(targets, indices)], dim=0).to(self.device)
         tgt_boxes = tgt_boxes[~pos_ignore_idx]
         matched_pred_box = pred_box.reshape(-1, 4)[src_idx[~pos_ignore_idx]]
-        loss_bboxes = self.loss_bboxes(matched_pred_box, 
-                                       tgt_boxes, 
+        loss_bboxes = self.loss_bboxes(matched_pred_box,
+                                       tgt_boxes,
                                        num_foreground)
 
         # total loss
@@ -177,6 +179,6 @@ def build_criterion(cfg, device, num_classes=80):
     criterion = Criterion(cfg=cfg, device=device, num_classes=num_classes)
     return criterion
 
-    
+
 if __name__ == "__main__":
     pass
